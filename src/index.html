@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BassMusic - 听障人士音频增强工具</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- 顶部标题栏 -->
+    <header class="app-header">
+      <div class="header-left">
+        <h1>BassMusic</h1>
+        <span class="header-subtitle">听障人士音频增强工具</span>
+      </div>
+      <button id="btn-help" class="btn-icon" title="帮助">?</button>
+    </header>
+
+    <!-- 主内容区：左右两栏 -->
+    <main class="app-main">
+      <!-- 左栏：文件转化 + 实时增强 -->
+      <section class="column column-left">
+        <!-- 文件转化区 -->
+        <div class="card">
+          <h2 class="card-title">文件转化</h2>
+          <div class="form-group">
+            <label>输入文件</label>
+            <div class="file-row">
+              <span id="input-path" class="file-path">未选择文件</span>
+              <button id="btn-select-input" class="btn btn-outline">选择文件</button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>输出路径</label>
+            <div class="file-row">
+              <span id="output-path" class="file-path">未选择路径</span>
+              <button id="btn-select-output" class="btn btn-outline">选择路径</button>
+            </div>
+          </div>
+          <button id="btn-convert" class="btn btn-primary" disabled>开始转化</button>
+          <div class="progress-wrap">
+            <div class="progress-bar">
+              <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            </div>
+            <span id="progress-text" class="progress-text">0%</span>
+          </div>
+        </div>
+
+        <!-- 实时增强区 -->
+        <div class="card">
+          <h2 class="card-title">实时增强</h2>
+          <div class="realtime-row">
+            <button id="btn-start-rt" class="btn btn-primary">启动</button>
+            <button id="btn-stop-rt" class="btn btn-danger" disabled>停止</button>
+            <span id="rt-status" class="status-dot"></span>
+            <span id="rt-status-text">未运行</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- 右栏：参数面板 -->
+      <section class="column column-right">
+        <div class="card">
+          <h2 class="card-title">参数调节</h2>
+
+          <div class="param-group">
+            <div class="param-header">
+              <label>低频增益</label>
+              <span id="val-bass-gain" class="param-value">6.0 dB</span>
+            </div>
+            <input type="range" id="slider-bass-gain" class="slider"
+                   min="0" max="20" step="0.5" value="6" />
+          </div>
+
+          <div class="param-group">
+            <div class="param-header">
+              <label>截止频率</label>
+              <span id="val-cutoff-freq" class="param-value">300 Hz</span>
+            </div>
+            <input type="range" id="slider-cutoff-freq" class="slider"
+                   min="100" max="500" step="10" value="300" />
+          </div>
+
+          <div class="param-group">
+            <div class="param-header">
+              <label>频移比率</label>
+              <span id="val-shift-ratio" class="param-value">0.50</span>
+            </div>
+            <input type="range" id="slider-shift-ratio" class="slider"
+                   min="0.1" max="1.0" step="0.05" value="0.5" />
+          </div>
+
+          <div class="param-group">
+            <div class="param-header">
+              <label>压缩比</label>
+              <span id="val-compress-ratio" class="param-value">3.0</span>
+            </div>
+            <input type="range" id="slider-compress-ratio" class="slider"
+                   min="1" max="10" step="0.5" value="3" />
+          </div>
+
+          <div class="param-group">
+            <div class="param-header">
+              <label>输出音量</label>
+              <span id="val-output-volume" class="param-value">100%</span>
+            </div>
+            <input type="range" id="slider-output-volume" class="slider"
+                   min="50" max="150" step="5" value="100" />
+          </div>
+
+          <button id="btn-reset-params" class="btn btn-outline btn-block">重置默认参数</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- 底部状态栏 -->
+    <footer class="app-footer">
+      <span id="status-msg" class="status-msg">就绪</span>
+    </footer>
+
+    <!-- 帮助模态框 -->
+    <div id="modal-help" class="modal-overlay" hidden>
+      <div class="modal">
+        <div class="modal-header">
+          <h3>操作指南</h3>
+          <button id="btn-close-help" class="btn-icon">&times;</button>
+        </div>
+        <div class="modal-body">
+          <h4>文件转化</h4>
+          <p>选择需要增强的音频文件和输出保存路径，点击"开始转化"即可。转化过程中可查看进度条，完成后状态栏会提示。</p>
+          <h4>实时增强</h4>
+          <p>点击"启动"开始实时捕获并增强系统音频输出，点击"停止"结束。运行中修改参数会实时生效。建议使用耳机播放以避免反馈回路。</p>
+          <h4>参数说明</h4>
+          <ul>
+            <li><b>低频增益</b>：增强低频音量的分贝数（0~20 dB）</li>
+            <li><b>截止频率</b>：低频增强的频率上限（100~500 Hz）</li>
+            <li><b>频移比率</b>：将高频信号下移到低频区域的比率（0.1~1.0）</li>
+            <li><b>压缩比</b>：动态范围压缩比（1~10）</li>
+            <li><b>输出音量</b>：最终输出音量（50%~150%）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
