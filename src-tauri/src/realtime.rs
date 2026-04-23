@@ -57,7 +57,8 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
         return Err("实时增强已在运行中".to_string());
     }
 
-    let host = cpal::default_host();
+    let host = cpal::host_from_id(cpal::HostId::Wasapi)
+        .map_err(|e| format!("无法初始化 WASAPI Host: {}", e))?;
 
     // 获取默认输出设备（WASAPI Loopback 需要在输出设备上创建输入流）
     let device = host
