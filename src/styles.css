@@ -243,6 +243,30 @@ body::before {
   border-color: var(--border-light);
 }
 
+/* ---- Preset Select ---- */
+.preset-select {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-input);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color var(--transition);
+}
+
+.preset-select:hover {
+  border-color: var(--border-light);
+}
+
+.preset-select:focus {
+  outline: none;
+  border-color: var(--accent-light);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
 /* ---- Buttons ---- */
 .btn {
   display: inline-flex;
