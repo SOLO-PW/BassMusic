@@ -8,137 +8,229 @@
 </head>
 <body>
   <div id="app">
-    <!-- 顶部标题栏 -->
     <header class="app-header">
-      <div class="header-left">
-        <h1>BassMusic</h1>
-        <span class="header-subtitle">听障人士音频增强工具</span>
+      <div class="header-brand">
+        <div class="brand-icon">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+            <circle cx="14" cy="14" r="13" stroke="url(#grad1)" stroke-width="2"/>
+            <path d="M10 18V10l8 4-8 4z" fill="url(#grad1)"/>
+            <rect x="8" y="19" width="2.5" height="4" rx="1" fill="url(#grad1)"/>
+            <rect x="17.5" y="19" width="2.5" height="4" rx="1" fill="url(#grad1)"/>
+            <defs>
+              <linearGradient id="grad1" x1="0" y1="0" x2="28" y2="28">
+                <stop offset="0%" stop-color="#6c5ce7"/>
+                <stop offset="100%" stop-color="#e84393"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <h1>BassMusic</h1>
+          <span class="header-subtitle">听障人士音频增强工具</span>
+        </div>
       </div>
-      <button id="btn-help" class="btn-icon" title="帮助">?</button>
+      <div class="header-actions">
+        <button id="btn-help" class="btn-icon" title="帮助">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+        </button>
+      </div>
     </header>
 
-    <!-- 主内容区：左右两栏 -->
     <main class="app-main">
-      <!-- 左栏：文件转化 + 实时增强 -->
       <section class="column column-left">
-        <!-- 文件转化区 -->
-        <div class="card">
-          <h2 class="card-title">文件转化</h2>
-          <div class="form-group">
-            <label>输入文件</label>
-            <div class="file-row">
-              <span id="input-path" class="file-path">未选择文件</span>
-              <button id="btn-select-input" class="btn btn-outline">选择文件</button>
+        <div class="card card-file">
+          <div class="card-header">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14,2 14,8 20,8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
             </div>
+            <h2 class="card-title">文件转化</h2>
           </div>
-          <div class="form-group">
-            <label>输出路径</label>
-            <div class="file-row">
-              <span id="output-path" class="file-path">未选择路径</span>
-              <button id="btn-select-output" class="btn btn-outline">选择路径</button>
+          <div class="card-body">
+            <div class="form-group">
+              <label>输入文件</label>
+              <div class="file-row">
+                <span id="input-path" class="file-path">未选择文件</span>
+                <button id="btn-select-input" class="btn btn-ghost">选择文件</button>
+              </div>
             </div>
-          </div>
-          <button id="btn-convert" class="btn btn-primary" disabled>开始转化</button>
-          <div class="progress-wrap">
-            <div class="progress-bar">
-              <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+            <div class="form-group">
+              <label>输出路径</label>
+              <div class="file-row">
+                <span id="output-path" class="file-path">未选择路径</span>
+                <button id="btn-select-output" class="btn btn-ghost">选择路径</button>
+              </div>
             </div>
-            <span id="progress-text" class="progress-text">0%</span>
+            <button id="btn-convert" class="btn btn-primary btn-block" disabled>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="17,1 21,5 17,9"/>
+                <path d="M3 11V9a4 4 0 014-4h14"/>
+                <polyline points="7,23 3,19 7,15"/>
+                <path d="M21 13v2a4 4 0 01-4 4H3"/>
+              </svg>
+              开始转化
+            </button>
+            <div class="progress-wrap">
+              <div class="progress-bar">
+                <div id="progress-fill" class="progress-fill" style="width: 0%"></div>
+              </div>
+              <span id="progress-text" class="progress-text">0%</span>
+            </div>
           </div>
         </div>
 
-        <!-- 实时增强区 -->
-        <div class="card">
-          <h2 class="card-title">实时增强</h2>
-          <div class="realtime-row">
-            <button id="btn-start-rt" class="btn btn-primary">启动</button>
-            <button id="btn-stop-rt" class="btn btn-danger" disabled>停止</button>
-            <span id="rt-status" class="status-dot"></span>
-            <span id="rt-status-text">未运行</span>
+        <div class="card card-realtime">
+          <div class="card-header">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11,5 6,9 2,9 2,15 6,15 11,19"/>
+                <path d="M15.54 8.46a5 5 0 010 7.07"/>
+                <path d="M19.07 4.93a10 10 0 010 14.14"/>
+              </svg>
+            </div>
+            <h2 class="card-title">实时增强</h2>
+            <div class="status-badge" id="rt-status-badge">
+              <span id="rt-status" class="status-dot"></span>
+              <span id="rt-status-text">未运行</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="realtime-controls">
+              <button id="btn-start-rt" class="btn btn-primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+                启动
+              </button>
+              <button id="btn-stop-rt" class="btn btn-danger" disabled>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="4" y="4" width="16" height="16" rx="2"/>
+                </svg>
+                停止
+              </button>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- 右栏：参数面板 -->
       <section class="column column-right">
-        <div class="card">
-          <h2 class="card-title">参数调节</h2>
-
-          <div class="param-group">
-            <div class="param-header">
-              <label>低频增益</label>
-              <span id="val-bass-gain" class="param-value">6.0 dB</span>
+        <div class="card card-params">
+          <div class="card-header">
+            <div class="card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="4" y1="21" x2="4" y2="14"/>
+                <line x1="4" y1="10" x2="4" y2="3"/>
+                <line x1="12" y1="21" x2="12" y2="12"/>
+                <line x1="12" y1="8" x2="12" y2="3"/>
+                <line x1="20" y1="21" x2="20" y2="16"/>
+                <line x1="20" y1="12" x2="20" y2="3"/>
+                <line x1="1" y1="14" x2="7" y2="14"/>
+                <line x1="9" y1="8" x2="15" y2="8"/>
+                <line x1="17" y1="16" x2="23" y2="16"/>
+              </svg>
             </div>
-            <input type="range" id="slider-bass-gain" class="slider"
-                   min="0" max="20" step="0.5" value="6" />
+            <h2 class="card-title">参数调节</h2>
           </div>
-
-          <div class="param-group">
-            <div class="param-header">
-              <label>截止频率</label>
-              <span id="val-cutoff-freq" class="param-value">300 Hz</span>
+          <div class="card-body">
+            <div class="param-group">
+              <div class="param-header">
+                <label>低频增益</label>
+                <span id="val-bass-gain" class="param-value">6.0 dB</span>
+              </div>
+              <input type="range" id="slider-bass-gain" class="slider" min="0" max="20" step="0.5" value="6" />
             </div>
-            <input type="range" id="slider-cutoff-freq" class="slider"
-                   min="100" max="500" step="10" value="300" />
-          </div>
 
-          <div class="param-group">
-            <div class="param-header">
-              <label>频移比率</label>
-              <span id="val-shift-ratio" class="param-value">0.50</span>
+            <div class="param-group">
+              <div class="param-header">
+                <label>截止频率</label>
+                <span id="val-cutoff-freq" class="param-value">300 Hz</span>
+              </div>
+              <input type="range" id="slider-cutoff-freq" class="slider" min="100" max="500" step="10" value="300" />
             </div>
-            <input type="range" id="slider-shift-ratio" class="slider"
-                   min="0.1" max="1.0" step="0.05" value="0.5" />
-          </div>
 
-          <div class="param-group">
-            <div class="param-header">
-              <label>压缩比</label>
-              <span id="val-compress-ratio" class="param-value">3.0</span>
+            <div class="param-group">
+              <div class="param-header">
+                <label>频移比率</label>
+                <span id="val-shift-ratio" class="param-value">0.50</span>
+              </div>
+              <input type="range" id="slider-shift-ratio" class="slider" min="0.1" max="1.0" step="0.05" value="0.5" />
             </div>
-            <input type="range" id="slider-compress-ratio" class="slider"
-                   min="1" max="10" step="0.5" value="3" />
-          </div>
 
-          <div class="param-group">
-            <div class="param-header">
-              <label>输出音量</label>
-              <span id="val-output-volume" class="param-value">100%</span>
+            <div class="param-group">
+              <div class="param-header">
+                <label>压缩比</label>
+                <span id="val-compress-ratio" class="param-value">3.0</span>
+              </div>
+              <input type="range" id="slider-compress-ratio" class="slider" min="1" max="10" step="0.5" value="3" />
             </div>
-            <input type="range" id="slider-output-volume" class="slider"
-                   min="50" max="150" step="5" value="100" />
-          </div>
 
-          <button id="btn-reset-params" class="btn btn-outline btn-block">重置默认参数</button>
+            <div class="param-group">
+              <div class="param-header">
+                <label>输出音量</label>
+                <span id="val-output-volume" class="param-value">100%</span>
+              </div>
+              <input type="range" id="slider-output-volume" class="slider" min="50" max="150" step="5" value="100" />
+            </div>
+
+            <button id="btn-reset-params" class="btn btn-ghost btn-block">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="1,4 1,10 7,10"/>
+                <path d="M3.51 15a9 9 0 102.13-9.36L1 10"/>
+              </svg>
+              重置默认参数
+            </button>
+          </div>
         </div>
       </section>
     </main>
 
-    <!-- 底部状态栏 -->
     <footer class="app-footer">
-      <span id="status-msg" class="status-msg">就绪</span>
+      <div class="footer-left">
+        <span id="status-msg" class="status-msg">就绪</span>
+      </div>
+      <div class="footer-right">
+        <span class="footer-version">v0.1.0</span>
+      </div>
     </footer>
 
-    <!-- 帮助模态框 -->
     <div id="modal-help" class="modal-overlay" hidden>
       <div class="modal">
         <div class="modal-header">
           <h3>操作指南</h3>
-          <button id="btn-close-help" class="btn-icon">&times;</button>
+          <button id="btn-close-help" class="btn-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"/>
+              <line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
         </div>
         <div class="modal-body">
-          <h4>文件转化</h4>
-          <p>选择需要增强的音频文件和输出保存路径，点击"开始转化"即可。转化过程中可查看进度条，完成后状态栏会提示。</p>
-          <h4>实时增强</h4>
-          <p>点击"启动"开始实时捕获并增强系统音频输出，点击"停止"结束。运行中修改参数会实时生效。建议使用耳机播放以避免反馈回路。</p>
-          <h4>参数说明</h4>
-          <ul>
-            <li><b>低频增益</b>：增强低频音量的分贝数（0~20 dB）</li>
-            <li><b>截止频率</b>：低频增强的频率上限（100~500 Hz）</li>
-            <li><b>频移比率</b>：将高频信号下移到低频区域的比率（0.1~1.0）</li>
-            <li><b>压缩比</b>：动态范围压缩比（1~10）</li>
-            <li><b>输出音量</b>：最终输出音量（50%~150%）</li>
-          </ul>
+          <div class="help-section">
+            <h4>文件转化</h4>
+            <p>选择需要增强的音频文件和输出保存路径，点击"开始转化"即可。转化过程中可查看进度条，完成后状态栏会提示。</p>
+          </div>
+          <div class="help-section">
+            <h4>实时增强</h4>
+            <p>点击"启动"开始实时捕获并增强系统音频输出，点击"停止"结束。运行中修改参数会实时生效。建议使用耳机播放以避免反馈回路。</p>
+          </div>
+          <div class="help-section">
+            <h4>参数说明</h4>
+            <ul>
+              <li><b>低频增益</b>：增强低频音量的分贝数（0~20 dB）</li>
+              <li><b>截止频率</b>：低频增强的频率上限（100~500 Hz）</li>
+              <li><b>频移比率</b>：将高频信号下移到低频区域的比率（0.1~1.0）</li>
+              <li><b>压缩比</b>：动态范围压缩比（1~10）</li>
+              <li><b>输出音量</b>：最终输出音量（50%~150%）</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

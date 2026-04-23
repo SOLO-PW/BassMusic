@@ -139,6 +139,16 @@ async function selectOutputPath() {
 }
 
 /**
+ * 更新含图标的按钮文本，保留 SVG 不被覆盖
+ */
+function setBtnText(btn, text) {
+  const textNode = Array.from(btn.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+  if (textNode) {
+    textNode.textContent = ' ' + text;
+  }
+}
+
+/**
  * 执行文件转化，调用后端 convert_audio_file 命令
  */
 async function startConvert() {
@@ -146,7 +156,7 @@ async function startConvert() {
 
   state.isConverting = true;
   dom.btnConvert.disabled = true;
-  dom.btnConvert.textContent = '转化中...';
+  setBtnText(dom.btnConvert, '转化中...');
   setProgress(0);
   setStatus('正在转化...');
 
@@ -162,7 +172,7 @@ async function startConvert() {
     setStatus('转化失败: ' + e, 'error');
   } finally {
     state.isConverting = false;
-    dom.btnConvert.textContent = '开始转化';
+    setBtnText(dom.btnConvert, '开始转化');
     updateConvertBtnState();
   }
 }
