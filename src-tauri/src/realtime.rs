@@ -4,6 +4,7 @@
 
 use crate::dsp;
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::SupportedStreamConfig;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
@@ -90,15 +91,19 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
         .default_output_device()
         .ok_or("无法获取音频输出设备，请检查音频设备连接")?;
 
-    // 获取 Loopback 输入配置（在输出设备上获取输入配置即启用 Loopback 模式）
-    let input_config = device
-        .default_input_config()
-        .map_err(|e| format!("无法获取 Loopback 输入配置: {}。请确认系统支持 WASAPI Loopback", e))?;
-
     // 获取输出配置
     let output_config = device
         .default_output_config()
         .map_err(|e| format!("无法获取音频输出配置: {}", e))?;
+
+    // 获取 Loopback 输入配置
+    // cpal 的 default_input_config() 在输出设备上会返回 StreamTypeNotSupported，
+    // 因为 WASAPI 输出设备的 data_flow 是 eRender 而非 eCapture。
+    // 但 Loopback 流的格式与输出流完全一致，所以直接用输出配置构造输入配置。
+    let input_config = match device.default_input_config() {
+        Ok(cfg) => cfg,
+        Err(_) => loopback_config_from_output(&output_config),
+    };
 
     let sample_rate = input_config.sample_rate().0;
     let in_channels = input_config.channels();
@@ -381,4 +386,17 @@ fn process_output_buffer(
             *ch = sample;
         }
     }
+}
+
+/// 从输出配置构造 Loopback 输入配置
+///
+/// WASAPI Loopback 流的格式与输出流完全一致（同一设备、同一 mix format），
+/// 当 cpal 的 default_input_config() 在输出设备上失败时使用此函数回退构造。
+fn loopback_config_from_output(output_config: &SupportedStreamConfig) -> SupportedStreamConfig {
+    SupportedStreamConfig::new(
+        output_config.channels(),
+        output_config.sample_rate(),
+        output_config.buffer_size().clone(),
+        output_config.sample_format(),
+    )
 }

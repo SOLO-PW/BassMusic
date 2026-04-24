@@ -112,7 +112,9 @@ function setProgress(percent) {
  */
 async function selectInputFile() {
   try {
-    const selected = await invoke('plugin:dialog|open', { multiple: false, directory: false });
+    const selected = await invoke('plugin:dialog|open', {
+      options: { multiple: false, directory: false, title: '选择音频文件' }
+    });
     if (selected) {
       state.inputPath = selected;
       dom.inputPath.textContent = selected;
@@ -129,7 +131,9 @@ async function selectInputFile() {
  */
 async function selectOutputPath() {
   try {
-    const selected = await invoke('plugin:dialog|save', { defaultPath: 'enhanced.wav' });
+    const selected = await invoke('plugin:dialog|save', {
+      options: { defaultPath: 'enhanced.wav', title: '保存增强音频' }
+    });
     if (selected) {
       state.outputPath = selected;
       dom.outputPath.textContent = selected;
