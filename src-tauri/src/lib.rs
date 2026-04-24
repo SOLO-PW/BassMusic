@@ -16,17 +16,11 @@ struct AppState {
     converting: Arc<AtomicBool>,
 }
 
-/// 测试用问候命令，验证前后端 IPC 通信是否正常
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("你好, {}! 欢迎使用 BassMusic.", name)
-}
-
-/// 音频文件低频增强转化命令
-/// 接收输入文件路径、输出路径和增强参数，执行解码→DSP增强→编码流程
+/// 音频文件低频增强转化命令（异步）
+/// 接收输入文件路径、输出路径和增强参数，在独立线程执行解码→DSP增强→编码流程
 /// 通过 Tauri Event 推送处理进度
 #[tauri::command]
-fn convert_audio_file(
+async fn convert_audio_file(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     input_path: String,
@@ -45,35 +39,50 @@ fn convert_audio_file(
 
     state.converting.store(true, Ordering::SeqCst);
 
-    let _ = app.emit("convert-progress", 0u32);
+    let app_clone = app.clone();
+    let converting = state.converting.clone();
 
-    let (samples, sample_rate) = audio::decode_audio_file(&input_path)?;
-    let _ = app.emit("convert-progress", 10u32);
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        let _ = app_clone.emit("convert-progress", 0u32);
 
-    let total_samples = samples.len();
-    let chunk_size = 4096;
-    let mut enhanced = Vec::with_capacity(total_samples);
-    let chunks = (total_samples + chunk_size - 1) / chunk_size;
+        let (samples, sample_rate) = match audio::decode_audio_file(&input_path) {
+            Ok(r) => r,
+            Err(e) => {
+                converting.store(false, Ordering::SeqCst);
+                return Err(e);
+            }
+        };
+        let _ = app_clone.emit("convert-progress", 10u32);
 
-    for (i, chunk) in samples.chunks(chunk_size).enumerate() {
-        let processed = dsp::pipeline::process_chunk(chunk, sample_rate, &params);
-        enhanced.extend_from_slice(&processed);
+        let total_samples = samples.len();
+        let chunk_size = 4096;
+        let mut enhanced = Vec::with_capacity(total_samples);
+        let chunks = (total_samples + chunk_size - 1) / chunk_size;
 
-        let progress = 10 + ((i + 1) * 80 / chunks.max(1)) as u32;
-        let _ = app.emit("convert-progress", progress.min(90));
-    }
+        for (i, chunk) in samples.chunks(chunk_size).enumerate() {
+            let processed = dsp::pipeline::process_chunk(chunk, sample_rate, &params);
+            enhanced.extend_from_slice(&processed);
 
-    let _ = app.emit("convert-progress", 92u32);
+            let progress = 10 + ((i + 1) * 80 / chunks.max(1)) as u32;
+            let _ = app_clone.emit("convert-progress", progress.min(90));
+        }
 
-    audio::encode_wav_file(&output_path, &enhanced, sample_rate)?;
+        let _ = app_clone.emit("convert-progress", 92u32);
 
-    let _ = app.emit("convert-progress", 100u32);
-    state.converting.store(false, Ordering::SeqCst);
+        if let Err(e) = audio::encode_wav_file(&output_path, &enhanced, sample_rate) {
+            converting.store(false, Ordering::SeqCst);
+            return Err(e);
+        }
 
-    Ok(format!(
-        "转化完成！输出文件: {}",
-        output_path
-    ))
+        let _ = app_clone.emit("convert-progress", 100u32);
+        converting.store(false, Ordering::SeqCst);
+
+        Ok(format!("转化完成！输出文件: {}", output_path))
+    })
+    .await
+    .map_err(|e| format!("任务执行失败: {}", e))?;
+
+    result
 }
 
 /// 启动实时音频增强
@@ -112,7 +121,6 @@ pub fn run() {
             converting: Arc::new(AtomicBool::new(false)),
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
             convert_audio_file,
             start_realtime,
             stop_realtime,

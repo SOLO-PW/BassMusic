@@ -19,6 +19,28 @@ pub struct SendableStream(#[allow(dead_code)] cpal::Stream);
 // 此 unsafe impl 仅在 Windows WASAPI 场景下安全，其他平台需另行评估。
 unsafe impl Send for SendableStream {}
 
+/// 预分配的音频处理缓冲区，避免在实时回调中动态分配内存
+struct AudioBuffers {
+    /// 单声道混合输入缓冲区
+    mono_input: Vec<f64>,
+}
+
+impl AudioBuffers {
+    fn new() -> Self {
+        Self {
+            mono_input: Vec::new(),
+        }
+    }
+
+    /// 确保 mono_input 缓冲区至少能容纳 frame_count 个采样
+    fn ensure_capacity(&mut self, frame_count: usize) {
+        if self.mono_input.capacity() < frame_count {
+            self.mono_input.reserve_exact(frame_count - self.mono_input.capacity());
+        }
+        self.mono_input.clear();
+    }
+}
+
 /// 实时增强器的共享状态
 ///
 /// 通过 Arc + AtomicBool/Mutex 实现跨线程安全访问：
@@ -31,6 +53,8 @@ pub struct RealtimeState {
     pub params: Arc<Mutex<dsp::pipeline::EnhanceParams>>,
     /// 音频流句柄（drop 时自动停止流）
     pub streams: Mutex<Vec<SendableStream>>,
+    /// 预分配的音频处理缓冲区
+    buffers: Arc<Mutex<AudioBuffers>>,
 }
 
 impl RealtimeState {
@@ -40,6 +64,7 @@ impl RealtimeState {
             running: Arc::new(AtomicBool::new(false)),
             params: Arc::new(Mutex::new(dsp::pipeline::EnhanceParams::default())),
             streams: Mutex::new(Vec::new()),
+            buffers: Arc::new(Mutex::new(AudioBuffers::new())),
         }
     }
 }
@@ -94,6 +119,7 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
 
     let running = state.running.clone();
     let params = state.params.clone();
+    let buffers = state.buffers.clone();
 
     // 构建输入流（Loopback 捕获系统音频）
     let input_stream = build_input_stream(&device, &input_config, tx, running.clone())?;
@@ -105,6 +131,7 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
         rx,
         running.clone(),
         params,
+        buffers,
         sample_rate,
         in_channels,
         out_channels,
@@ -218,6 +245,7 @@ fn build_output_stream(
     rx: crossbeam_channel::Receiver<f64>,
     running: Arc<AtomicBool>,
     params: Arc<Mutex<dsp::pipeline::EnhanceParams>>,
+    buffers: Arc<Mutex<AudioBuffers>>,
     sample_rate: u32,
     in_channels: u16,
     out_channels: u16,
@@ -234,6 +262,7 @@ fn build_output_stream(
                         &rx,
                         &running,
                         &params,
+                        &buffers,
                         sample_rate,
                         in_channels,
                         out_channels,
@@ -253,6 +282,7 @@ fn build_output_stream(
                         &rx,
                         &running,
                         &params,
+                        &buffers,
                         sample_rate,
                         in_channels,
                         out_channels,
@@ -275,6 +305,7 @@ fn build_output_stream(
                         &rx,
                         &running,
                         &params,
+                        &buffers,
                         sample_rate,
                         in_channels,
                         out_channels,
@@ -303,6 +334,7 @@ fn process_output_buffer(
     rx: &crossbeam_channel::Receiver<f64>,
     running: &AtomicBool,
     params: &Mutex<dsp::pipeline::EnhanceParams>,
+    buffers: &Mutex<AudioBuffers>,
     sample_rate: u32,
     in_channels: u16,
     out_channels: u16,
@@ -314,29 +346,31 @@ fn process_output_buffer(
 
     let frame_count = data.len() / out_channels as usize;
 
-    // 从通道读取并混合为单声道（取各声道均值）
-    let mut mono_input = Vec::with_capacity(frame_count);
-    for _ in 0..frame_count {
-        let mut sum = 0.0;
-        let mut count = 0u32;
-        for _ in 0..in_channels {
-            if let Ok(sample) = rx.try_recv() {
-                sum += sample;
-                count += 1;
-            }
-        }
-        mono_input.push(if count > 0 {
-            sum / count as f64
-        } else {
-            0.0 // 缓冲区欠载时填充静音
-        });
-    }
-
-    // DSP 增强处理
     let current_params = params.lock().unwrap().clone();
-    let enhanced = dsp::pipeline::process_chunk(&mono_input, sample_rate, &current_params);
 
-    // 填充输出缓冲区（单声道扩展到多声道）
+    let enhanced = {
+        let mut buf = buffers.lock().unwrap();
+        buf.ensure_capacity(frame_count);
+
+        for _ in 0..frame_count {
+            let mut sum = 0.0;
+            let mut count = 0u32;
+            for _ in 0..in_channels {
+                if let Ok(sample) = rx.try_recv() {
+                    sum += sample;
+                    count += 1;
+                }
+            }
+            buf.mono_input.push(if count > 0 {
+                sum / count as f64
+            } else {
+                0.0
+            });
+        }
+
+        dsp::pipeline::process_chunk(&buf.mono_input, sample_rate, &current_params)
+    };
+
     for (i, frame) in data.chunks_mut(out_channels as usize).enumerate() {
         let sample = if i < enhanced.len() {
             enhanced[i] as f32

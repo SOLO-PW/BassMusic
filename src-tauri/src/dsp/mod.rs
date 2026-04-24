@@ -7,8 +7,22 @@ pub mod compressor;
 pub mod frequency_shift;
 pub mod pipeline;
 
-// 导出核心类型，方便外部使用
 pub use pipeline::EnhanceParams;
+
+/// 将输入长度向上对齐到最近的 2 的幂
+pub fn next_power_of_two(n: usize) -> usize {
+    if n == 0 {
+        return 1;
+    }
+    let mut v = n - 1;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v |= v >> 32;
+    v + 1
+}
 
 #[cfg(test)]
 mod tests {
@@ -135,6 +149,9 @@ mod tests {
         assert!((params.cutoff_freq - 300.0).abs() < 1e-6);
         assert!((params.shift_ratio - 0.5).abs() < 1e-6);
         assert!((params.compress_ratio - 3.0).abs() < 1e-6);
+        assert!((params.threshold_db - (-20.0)).abs() < 1e-6);
+        assert!((params.attack_ms - 10.0).abs() < 1e-6);
+        assert!((params.release_ms - 100.0).abs() < 1e-6);
         assert!((params.output_volume - 1.0).abs() < 1e-6);
     }
 

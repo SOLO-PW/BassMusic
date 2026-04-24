@@ -1,6 +1,5 @@
 // BassMusic - 前端交互逻辑
 
-/** Tauri API 快捷引用 */
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
@@ -41,7 +40,6 @@ const dom = {
   btnHelp: $('btn-help'),
   btnCloseHelp: $('btn-close-help'),
   modalHelp: $('modal-help'),
-  // 滑块和值显示
   sliderBassGain: $('slider-bass-gain'),
   valBassGain: $('val-bass-gain'),
   sliderCutoffFreq: $('slider-cutoff-freq'),
@@ -53,6 +51,11 @@ const dom = {
   sliderOutputVolume: $('slider-output-volume'),
   valOutputVolume: $('val-output-volume'),
 };
+
+/** 防抖定时器 ID */
+let paramDebounceTimer = null;
+/** 防抖延迟（ms） */
+const PARAM_DEBOUNCE_MS = 150;
 
 /**
  * 在状态栏显示消息，支持 info / error / success 三种类型
@@ -212,16 +215,19 @@ async function stopRealtime() {
 }
 
 /**
- * 当参数变化时，若实时增强运行中则自动更新参数
+ * 当参数变化时，若实时增强运行中则防抖更新参数
  */
-async function onParamChange() {
+function onParamChange() {
   updateParamDisplay();
   if (state.isRealtimeRunning) {
-    try {
-      await invoke('update_realtime_params', { params: buildParams() });
-    } catch (e) {
-      setStatus('更新参数失败: ' + e, 'error');
-    }
+    if (paramDebounceTimer) clearTimeout(paramDebounceTimer);
+    paramDebounceTimer = setTimeout(async () => {
+      try {
+        await invoke('update_realtime_params', { params: buildParams() });
+      } catch (e) {
+        setStatus('更新参数失败: ' + e, 'error');
+      }
+    }, PARAM_DEBOUNCE_MS);
   }
 }
 
@@ -279,17 +285,14 @@ function bindEvents() {
   dom.btnHelp.addEventListener('click', openHelp);
   dom.btnCloseHelp.addEventListener('click', closeHelp);
 
-  // 点击模态框背景关闭
   dom.modalHelp.addEventListener('click', (e) => {
     if (e.target === dom.modalHelp) closeHelp();
   });
 
-  // ESC 键关闭模态框
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !dom.modalHelp.hidden) closeHelp();
   });
 
-  // 参数滑块变化事件
   const sliders = [
     dom.sliderBassGain, dom.sliderCutoffFreq, dom.sliderShiftRatio,
     dom.sliderCompressRatio, dom.sliderOutputVolume,
