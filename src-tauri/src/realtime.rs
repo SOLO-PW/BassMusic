@@ -84,7 +84,7 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
     }
 
     #[cfg(target_os = "windows")] {
-        // 获取默认输出设备（WASAPI Loopback 需要在输出设备上创建输入流）
+        let host = cpal::default_host();
         let device = host
             .default_output_device()
             .ok_or("无法获取音频输出设备，请检查音频设备连接")?;
