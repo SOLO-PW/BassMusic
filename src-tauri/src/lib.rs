@@ -55,7 +55,7 @@ async fn convert_audio_file(
         let _ = app_clone.emit("convert-progress", 10u32);
 
         let total_samples = samples.len();
-        let chunk_size = 4096;
+        let chunk_size = 8192; // 增大块大小，减少处理次数
         let mut enhanced = Vec::with_capacity(total_samples);
         let chunks = (total_samples + chunk_size - 1) / chunk_size;
 
@@ -63,8 +63,11 @@ async fn convert_audio_file(
             let processed = dsp::pipeline::process_chunk(chunk, sample_rate, &params);
             enhanced.extend_from_slice(&processed);
 
-            let progress = 10 + ((i + 1) * 80 / chunks.max(1)) as u32;
-            let _ = app_clone.emit("convert-progress", progress.min(90));
+            // 减少进度更新频率，减少 IPC 开销
+            if (i + 1) % 4 == 0 || (i + 1) == chunks {
+                let progress = 10 + ((i + 1) * 80 / chunks.max(1)) as u32;
+                let _ = app_clone.emit("convert-progress", progress.min(90));
+            }
         }
 
         let _ = app_clone.emit("convert-progress", 92u32);

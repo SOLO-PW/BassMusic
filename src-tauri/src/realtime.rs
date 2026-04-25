@@ -72,7 +72,7 @@ impl RealtimeState {
 
 /// 启动实时音频增强
 ///
-/// 在默认输出设备上创建 WASAPI Loopback 输入流捕获系统音频，
+/// 在默认输出设备上创建 Loopback 输入流捕获系统音频，
 /// 经 DSP 管线处理后通过输出流播放增强音频。
 ///
 /// 注意：在同一设备上同时捕获和播放会产生反馈回路，
@@ -83,81 +83,83 @@ pub fn start_realtime_enhance(state: &RealtimeState) -> Result<(), String> {
         return Err("实时增强已在运行中".to_string());
     }
 
-    let host = cpal::host_from_id(cpal::HostId::Wasapi)
-        .map_err(|e| format!("无法初始化 WASAPI Host: {}", e))?;
+    #[cfg(target_os = "windows")] {
+        // 获取默认输出设备（WASAPI Loopback 需要在输出设备上创建输入流）
+        let device = host
+            .default_output_device()
+            .ok_or("无法获取音频输出设备，请检查音频设备连接")?;
 
-    // 获取默认输出设备（WASAPI Loopback 需要在输出设备上创建输入流）
-    let device = host
-        .default_output_device()
-        .ok_or("无法获取音频输出设备，请检查音频设备连接")?;
+        // 获取输出配置
+        let output_config = device
+            .default_output_config()
+            .map_err(|e| format!("无法获取音频输出配置: {}", e))?;
 
-    // 获取输出配置
-    let output_config = device
-        .default_output_config()
-        .map_err(|e| format!("无法获取音频输出配置: {}", e))?;
+        // 获取 Loopback 输入配置
+        // cpal 的 default_input_config() 在输出设备上会返回 StreamTypeNotSupported，
+        // 因为 WASAPI 输出设备的 data_flow 是 eRender 而非 eCapture。
+        // 但 Loopback 流的格式与输出流完全一致，所以直接用输出配置构造输入配置。
+        let input_config = match device.default_input_config() {
+            Ok(cfg) => cfg,
+            Err(_) => loopback_config_from_output(&output_config),
+        };
 
-    // 获取 Loopback 输入配置
-    // cpal 的 default_input_config() 在输出设备上会返回 StreamTypeNotSupported，
-    // 因为 WASAPI 输出设备的 data_flow 是 eRender 而非 eCapture。
-    // 但 Loopback 流的格式与输出流完全一致，所以直接用输出配置构造输入配置。
-    let input_config = match device.default_input_config() {
-        Ok(cfg) => cfg,
-        Err(_) => loopback_config_from_output(&output_config),
-    };
+        let sample_rate = input_config.sample_rate().0;
+        let in_channels = input_config.channels();
+        let out_channels = output_config.channels();
 
-    let sample_rate = input_config.sample_rate().0;
-    let in_channels = input_config.channels();
-    let out_channels = output_config.channels();
+        // 校验输入输出采样率一致
+        if input_config.sample_rate().0 != output_config.sample_rate().0 {
+            return Err(format!(
+                "输入输出采样率不匹配: 输入={}, 输出={}",
+                input_config.sample_rate().0,
+                output_config.sample_rate().0
+            ));
+        }
 
-    // 校验输入输出采样率一致
-    if input_config.sample_rate().0 != output_config.sample_rate().0 {
-        return Err(format!(
-            "输入输出采样率不匹配: 输入={}, 输出={}",
-            input_config.sample_rate().0,
-            output_config.sample_rate().0
-        ));
+        // 创建有界通道作为音频缓冲区（容量约 2 秒，平衡延迟与抗抖动）
+        let buffer_capacity = (sample_rate as usize) * in_channels as usize * 2;
+        let (tx, rx) = crossbeam_channel::bounded(buffer_capacity);
+
+        let running = state.running.clone();
+        let params = state.params.clone();
+        let buffers = state.buffers.clone();
+
+        // 构建输入流（Loopback 捕获系统音频）
+        let input_stream = build_input_stream(&device, &input_config, tx, running.clone())?;
+
+        // 构建输出流（播放增强后音频）
+        let output_stream = build_output_stream(
+            &device,
+            &output_config,
+            rx,
+            running.clone(),
+            params,
+            buffers,
+            sample_rate,
+            in_channels,
+            out_channels,
+        )?;
+
+        // 启动音频流
+        input_stream
+            .play()
+            .map_err(|e| format!("启动音频捕获失败: {}", e))?;
+        output_stream
+            .play()
+            .map_err(|e| format!("启动音频播放失败: {}", e))?;
+
+        // 保存流句柄（cpal::Stream 在 drop 时自动停止）
+        *state.streams.lock().unwrap() = vec![
+            SendableStream(input_stream),
+            SendableStream(output_stream),
+        ];
+        state.running.store(true, Ordering::SeqCst);
+
+        Ok(())
     }
-
-    // 创建有界通道作为音频缓冲区（容量约 2 秒，平衡延迟与抗抖动）
-    let buffer_capacity = (sample_rate as usize) * in_channels as usize * 2;
-    let (tx, rx) = crossbeam_channel::bounded(buffer_capacity);
-
-    let running = state.running.clone();
-    let params = state.params.clone();
-    let buffers = state.buffers.clone();
-
-    // 构建输入流（Loopback 捕获系统音频）
-    let input_stream = build_input_stream(&device, &input_config, tx, running.clone())?;
-
-    // 构建输出流（播放增强后音频）
-    let output_stream = build_output_stream(
-        &device,
-        &output_config,
-        rx,
-        running.clone(),
-        params,
-        buffers,
-        sample_rate,
-        in_channels,
-        out_channels,
-    )?;
-
-    // 启动音频流
-    input_stream
-        .play()
-        .map_err(|e| format!("启动音频捕获失败: {}", e))?;
-    output_stream
-        .play()
-        .map_err(|e| format!("启动音频播放失败: {}", e))?;
-
-    // 保存流句柄（cpal::Stream 在 drop 时自动停止）
-    *state.streams.lock().unwrap() = vec![
-        SendableStream(input_stream),
-        SendableStream(output_stream),
-    ];
-    state.running.store(true, Ordering::SeqCst);
-
-    Ok(())
+    
+    #[cfg(not(target_os = "windows"))]
+    Err("实时增强功能仅在 Windows 平台上可用".to_string())
 }
 
 /// 停止实时音频增强
@@ -351,12 +353,14 @@ fn process_output_buffer(
 
     let frame_count = data.len() / out_channels as usize;
 
+    // 获取当前增强参数
     let current_params = params.lock().unwrap().clone();
 
     let enhanced = {
         let mut buf = buffers.lock().unwrap();
         buf.ensure_capacity(frame_count);
 
+        // 批量读取和处理，减少锁的竞争
         for _ in 0..frame_count {
             let mut sum = 0.0;
             let mut count = 0u32;
@@ -364,6 +368,8 @@ fn process_output_buffer(
                 if let Ok(sample) = rx.try_recv() {
                     sum += sample;
                     count += 1;
+                } else {
+                    break; // 通道为空，停止尝试读取
                 }
             }
             buf.mono_input.push(if count > 0 {
@@ -376,14 +382,20 @@ fn process_output_buffer(
         dsp::pipeline::process_chunk(&buf.mono_input, sample_rate, &current_params)
     };
 
-    for (i, frame) in data.chunks_mut(out_channels as usize).enumerate() {
+    // 批量填充输出缓冲区，减少循环开销
+    let out_channels_usize = out_channels as usize;
+    for i in 0..frame_count {
         let sample = if i < enhanced.len() {
             enhanced[i] as f32
         } else {
             0.0
         };
-        for ch in frame.iter_mut() {
-            *ch = sample;
+        let start = i * out_channels_usize;
+        let end = start + out_channels_usize;
+        if end <= data.len() {
+            for ch in &mut data[start..end] {
+                *ch = sample;
+            }
         }
     }
 }

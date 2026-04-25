@@ -222,6 +222,13 @@ body::before {
   align-items: center;
 }
 
+.file-path-container {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .file-path {
   flex: 1;
   font-size: 0.8rem;
@@ -241,6 +248,31 @@ body::before {
 
 .file-path:not(:empty):hover {
   border-color: var(--border-light);
+}
+
+.btn-copy {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  opacity: 0;
+  pointer-events: none;
+  transition: all var(--transition);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.file-path-container:hover .btn-copy {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.btn-copy:hover {
+  border-color: rgba(108, 92, 231, 0.3);
+  color: var(--accent-light);
+  background: rgba(108, 92, 231, 0.08);
 }
 
 /* ---- Buttons ---- */
@@ -470,6 +502,30 @@ body::before {
   padding: 2px 8px;
   background: rgba(108, 92, 231, 0.08);
   border-radius: 6px;
+}
+
+.param-presets {
+  margin-bottom: 20px;
+}
+
+.param-header-label {
+  display: block;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.preset-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-sm {
+  padding: 6px 14px;
+  font-size: 0.75rem;
+  height: 32px;
 }
 
 /* ---- Custom Slider ---- */
