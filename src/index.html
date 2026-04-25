@@ -58,14 +58,30 @@
             <div class="form-group">
               <label>输入文件</label>
               <div class="file-row">
-                <span id="input-path" class="file-path">未选择文件</span>
+                <div class="file-path-container">
+                  <span id="input-path" class="file-path">未选择文件</span>
+                  <button id="btn-copy-input" class="btn-icon btn-copy" title="复制路径">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                </div>
                 <button id="btn-select-input" class="btn btn-ghost">选择文件</button>
               </div>
             </div>
             <div class="form-group">
               <label>输出路径</label>
               <div class="file-row">
-                <span id="output-path" class="file-path">未选择路径</span>
+                <div class="file-path-container">
+                  <span id="output-path" class="file-path">未选择路径</span>
+                  <button id="btn-copy-output" class="btn-icon btn-copy" title="复制路径">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                    </svg>
+                  </button>
+                </div>
                 <button id="btn-select-output" class="btn btn-ghost">选择路径</button>
               </div>
             </div>
@@ -180,6 +196,14 @@
               <input type="range" id="slider-output-volume" class="slider" min="50" max="150" step="5" value="100" />
             </div>
 
+            <div class="param-presets">
+              <label class="param-header-label">预设配置</label>
+              <div class="preset-buttons">
+                <button id="preset-standard" class="btn btn-ghost btn-sm">标准</button>
+                <button id="preset-strong" class="btn btn-ghost btn-sm">增强</button>
+                <button id="preset-gentle" class="btn btn-ghost btn-sm">柔和</button>
+              </div>
+            </div>
             <button id="btn-reset-params" class="btn btn-ghost btn-block">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="1,4 1,10 7,10"/>

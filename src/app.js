@@ -3,7 +3,7 @@
 const { invoke } = window.__TAURI__.core;
 const { listen } = window.__TAURI__.event;
 
-/** 默认参数值 */
+// ---- 配置和常量 ----
 const DEFAULT_PARAMS = {
   bass_gain_db: 6.0,
   cutoff_freq: 300.0,
@@ -12,7 +12,33 @@ const DEFAULT_PARAMS = {
   output_volume: 1.0,
 };
 
-/** 应用状态 */
+const PARAM_PRESETS = {
+  standard: {
+    bass_gain_db: 6.0,
+    cutoff_freq: 300.0,
+    shift_ratio: 0.5,
+    compress_ratio: 3.0,
+    output_volume: 1.0,
+  },
+  strong: {
+    bass_gain_db: 12.0,
+    cutoff_freq: 400.0,
+    shift_ratio: 0.4,
+    compress_ratio: 4.0,
+    output_volume: 1.1,
+  },
+  gentle: {
+    bass_gain_db: 3.0,
+    cutoff_freq: 250.0,
+    shift_ratio: 0.6,
+    compress_ratio: 2.0,
+    output_volume: 0.9,
+  },
+};
+
+const PARAM_DEBOUNCE_MS = 150;
+
+// ---- 应用状态 ----
 const state = {
   inputPath: '',
   outputPath: '',
@@ -24,22 +50,25 @@ const state = {
 const $ = (id) => document.getElementById(id);
 
 const dom = {
+  // 文件操作
   inputPath: $('input-path'),
   outputPath: $('output-path'),
   btnSelectInput: $('btn-select-input'),
   btnSelectOutput: $('btn-select-output'),
+  btnCopyInput: $('btn-copy-input'),
+  btnCopyOutput: $('btn-copy-output'),
   btnConvert: $('btn-convert'),
   progressFill: $('progress-fill'),
   progressText: $('progress-text'),
+  
+  // 实时增强
   btnStartRt: $('btn-start-rt'),
   btnStopRt: $('btn-stop-rt'),
   rtStatus: $('rt-status'),
   rtStatusText: $('rt-status-text'),
+  
+  // 参数控制
   btnResetParams: $('btn-reset-params'),
-  statusMsg: $('status-msg'),
-  btnHelp: $('btn-help'),
-  btnCloseHelp: $('btn-close-help'),
-  modalHelp: $('modal-help'),
   sliderBassGain: $('slider-bass-gain'),
   valBassGain: $('val-bass-gain'),
   sliderCutoffFreq: $('slider-cutoff-freq'),
@@ -50,16 +79,23 @@ const dom = {
   valCompressRatio: $('val-compress-ratio'),
   sliderOutputVolume: $('slider-output-volume'),
   valOutputVolume: $('val-output-volume'),
+  
+  // 预设按钮
+  presetStandard: $('preset-standard'),
+  presetStrong: $('preset-strong'),
+  presetGentle: $('preset-gentle'),
+  
+  // 其他
+  statusMsg: $('status-msg'),
+  btnHelp: $('btn-help'),
+  btnCloseHelp: $('btn-close-help'),
+  modalHelp: $('modal-help'),
 };
 
-/** 防抖定时器 ID */
+// ---- 防抖定时器 ----
 let paramDebounceTimer = null;
-/** 防抖延迟（ms） */
-const PARAM_DEBOUNCE_MS = 150;
 
-/**
- * 在状态栏显示消息，支持 info / error / success 三种类型
- */
+// ---- UI 辅助函数 ----
 function setStatus(msg, type = 'info') {
   dom.statusMsg.textContent = msg;
   dom.statusMsg.className = 'status-msg';
@@ -67,9 +103,38 @@ function setStatus(msg, type = 'info') {
   if (type === 'success') dom.statusMsg.classList.add('success');
 }
 
-/**
- * 从当前滑块值构建后端所需的 params 对象
- */
+function updateParamDisplay() {
+  const updates = [
+    [dom.valBassGain, parseFloat(dom.sliderBassGain.value).toFixed(1) + ' dB'],
+    [dom.valCutoffFreq, parseFloat(dom.sliderCutoffFreq.value) + ' Hz'],
+    [dom.valShiftRatio, parseFloat(dom.sliderShiftRatio.value).toFixed(2)],
+    [dom.valCompressRatio, parseFloat(dom.sliderCompressRatio.value).toFixed(1)],
+    [dom.valOutputVolume, parseFloat(dom.sliderOutputVolume.value) + '%']
+  ];
+  
+  updates.forEach(([element, text]) => {
+    element.textContent = text;
+  });
+}
+
+function updateConvertBtnState() {
+  dom.btnConvert.disabled = !(state.inputPath && state.outputPath) || state.isConverting;
+}
+
+function setProgress(percent) {
+  const p = Math.min(100, Math.max(0, percent));
+  dom.progressFill.style.width = p + '%';
+  dom.progressText.textContent = p + '%';
+}
+
+function setBtnText(btn, text) {
+  const textNode = Array.from(btn.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
+  if (textNode) {
+    textNode.textContent = ' ' + text;
+  }
+}
+
+// ---- 核心功能函数 ----
 function buildParams() {
   return {
     bass_gain_db: parseFloat(dom.sliderBassGain.value),
@@ -80,40 +145,17 @@ function buildParams() {
   };
 }
 
-/**
- * 更新所有滑块旁的数值显示
- */
-function updateParamDisplay() {
-  dom.valBassGain.textContent = parseFloat(dom.sliderBassGain.value).toFixed(1) + ' dB';
-  dom.valCutoffFreq.textContent = parseFloat(dom.sliderCutoffFreq.value) + ' Hz';
-  dom.valShiftRatio.textContent = parseFloat(dom.sliderShiftRatio.value).toFixed(2);
-  dom.valCompressRatio.textContent = parseFloat(dom.sliderCompressRatio.value).toFixed(1);
-  dom.valOutputVolume.textContent = parseFloat(dom.sliderOutputVolume.value) + '%';
-}
-
-/**
- * 根据输入/输出路径是否都已选择来启用或禁用转化按钮
- */
-function updateConvertBtnState() {
-  dom.btnConvert.disabled = !(state.inputPath && state.outputPath) || state.isConverting;
-}
-
-/**
- * 更新进度条 UI
- */
-function setProgress(percent) {
-  const p = Math.min(100, Math.max(0, percent));
-  dom.progressFill.style.width = p + '%';
-  dom.progressText.textContent = p + '%';
-}
-
-/**
- * 选择输入文件，通过 Tauri 文件对话框
- */
 async function selectInputFile() {
   try {
     const selected = await invoke('plugin:dialog|open', {
-      options: { multiple: false, directory: false, title: '选择音频文件' }
+      options: {
+        multiple: false, 
+        directory: false, 
+        title: '选择音频文件',
+        filters: [
+          { name: '音频文件', extensions: ['wav', 'mp3', 'flac'] }
+        ]
+      }
     });
     if (selected) {
       state.inputPath = selected;
@@ -126,13 +168,23 @@ async function selectInputFile() {
   }
 }
 
-/**
- * 选择输出路径，通过 Tauri 保存对话框
- */
 async function selectOutputPath() {
   try {
+    let defaultPath = 'enhanced.wav';
+    if (state.inputPath) {
+      const inputName = state.inputPath.split('/').pop().split('\\').pop();
+      const baseName = inputName.replace(/\.[^/.]+$/, '');
+      defaultPath = `${baseName}_enhanced.wav`;
+    }
+    
     const selected = await invoke('plugin:dialog|save', {
-      options: { defaultPath: 'enhanced.wav', title: '保存增强音频' }
+      options: {
+        defaultPath,
+        title: '保存增强音频',
+        filters: [
+          { name: 'WAV 音频文件', extensions: ['wav'] }
+        ]
+      }
     });
     if (selected) {
       state.outputPath = selected;
@@ -145,19 +197,6 @@ async function selectOutputPath() {
   }
 }
 
-/**
- * 更新含图标的按钮文本，保留 SVG 不被覆盖
- */
-function setBtnText(btn, text) {
-  const textNode = Array.from(btn.childNodes).find(n => n.nodeType === Node.TEXT_NODE && n.textContent.trim());
-  if (textNode) {
-    textNode.textContent = ' ' + text;
-  }
-}
-
-/**
- * 执行文件转化，调用后端 convert_audio_file 命令
- */
 async function startConvert() {
   if (!state.inputPath || !state.outputPath) return;
 
@@ -184,9 +223,6 @@ async function startConvert() {
   }
 }
 
-/**
- * 启动实时增强，调用后端 start_realtime 命令
- */
 async function startRealtime() {
   try {
     const result = await invoke('start_realtime');
@@ -198,12 +234,13 @@ async function startRealtime() {
     setStatus('实时增强已启动: ' + result, 'success');
   } catch (e) {
     setStatus('启动失败: ' + e, 'error');
+    if (e.includes('仅在 Windows 平台上可用')) {
+      dom.btnStartRt.disabled = true;
+      dom.btnStartRt.title = '实时增强功能仅在 Windows 平台上可用';
+    }
   }
 }
 
-/**
- * 停止实时增强，调用后端 stop_realtime 命令
- */
 async function stopRealtime() {
   try {
     const result = await invoke('stop_realtime');
@@ -218,9 +255,6 @@ async function stopRealtime() {
   }
 }
 
-/**
- * 当参数变化时，若实时增强运行中则防抖更新参数
- */
 function onParamChange() {
   updateParamDisplay();
   if (state.isRealtimeRunning) {
@@ -235,9 +269,6 @@ function onParamChange() {
   }
 }
 
-/**
- * 重置所有参数滑块到默认值
- */
 function resetParams() {
   dom.sliderBassGain.value = DEFAULT_PARAMS.bass_gain_db;
   dom.sliderCutoffFreq.value = DEFAULT_PARAMS.cutoff_freq;
@@ -249,23 +280,31 @@ function resetParams() {
   setStatus('参数已重置为默认值');
 }
 
-/**
- * 打开帮助模态框
- */
-function openHelp() {
-  dom.modalHelp.hidden = false;
+async function copyPath(path) {
+  try {
+    await navigator.clipboard.writeText(path);
+    setStatus('路径已复制到剪贴板', 'success');
+  } catch (e) {
+    setStatus('复制路径失败: ' + e, 'error');
+  }
 }
 
-/**
- * 关闭帮助模态框
- */
-function closeHelp() {
-  dom.modalHelp.hidden = true;
+function applyPreset(presetName) {
+  const preset = PARAM_PRESETS[presetName];
+  if (!preset) return;
+  
+  dom.sliderBassGain.value = preset.bass_gain_db;
+  dom.sliderCutoffFreq.value = preset.cutoff_freq;
+  dom.sliderShiftRatio.value = preset.shift_ratio;
+  dom.sliderCompressRatio.value = preset.compress_ratio;
+  dom.sliderOutputVolume.value = preset.output_volume * 100;
+  
+  updateParamDisplay();
+  onParamChange();
+  setStatus(`已应用 ${presetName === 'standard' ? '标准' : presetName === 'strong' ? '增强' : '柔和'} 预设`);
 }
 
-/**
- * 监听后端 convert-progress 事件，更新进度条
- */
+// ---- 事件处理 ----
 function setupProgressListener() {
   listen('convert-progress', (event) => {
     const percent = Math.round(event.payload);
@@ -276,27 +315,47 @@ function setupProgressListener() {
   });
 }
 
-/**
- * 绑定所有 DOM 事件
- */
 function bindEvents() {
+  // 文件操作事件
   dom.btnSelectInput.addEventListener('click', selectInputFile);
   dom.btnSelectOutput.addEventListener('click', selectOutputPath);
+  dom.btnCopyInput.addEventListener('click', () => copyPath(state.inputPath));
+  dom.btnCopyOutput.addEventListener('click', () => copyPath(state.outputPath));
   dom.btnConvert.addEventListener('click', startConvert);
+  
+  // 实时增强事件
   dom.btnStartRt.addEventListener('click', startRealtime);
   dom.btnStopRt.addEventListener('click', stopRealtime);
+  
+  // 参数控制事件
   dom.btnResetParams.addEventListener('click', resetParams);
-  dom.btnHelp.addEventListener('click', openHelp);
-  dom.btnCloseHelp.addEventListener('click', closeHelp);
-
+  
+  // 预设按钮事件
+  dom.presetStandard.addEventListener('click', () => applyPreset('standard'));
+  dom.presetStrong.addEventListener('click', () => applyPreset('strong'));
+  dom.presetGentle.addEventListener('click', () => applyPreset('gentle'));
+  
+  // 帮助模态框事件
+  dom.btnHelp.addEventListener('click', () => {
+    dom.modalHelp.hidden = false;
+  });
+  dom.btnCloseHelp.addEventListener('click', () => {
+    dom.modalHelp.hidden = true;
+  });
   dom.modalHelp.addEventListener('click', (e) => {
-    if (e.target === dom.modalHelp) closeHelp();
+    if (e.target === dom.modalHelp) {
+      dom.modalHelp.hidden = true;
+    }
   });
-
+  
+  // 键盘事件
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !dom.modalHelp.hidden) closeHelp();
+    if (e.key === 'Escape' && !dom.modalHelp.hidden) {
+      dom.modalHelp.hidden = true;
+    }
   });
-
+  
+  // 滑块事件
   const sliders = [
     dom.sliderBassGain, dom.sliderCutoffFreq, dom.sliderShiftRatio,
     dom.sliderCompressRatio, dom.sliderOutputVolume,
@@ -306,9 +365,7 @@ function bindEvents() {
   });
 }
 
-/**
- * 应用初始化，在 DOM 加载完成后执行
- */
+// ---- 应用初始化 ----
 async function init() {
   updateParamDisplay();
   updateConvertBtnState();
